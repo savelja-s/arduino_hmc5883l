@@ -16,12 +16,12 @@ void MagnetometerHelper::initialize(MPU6050 initMpu)
     accelgyro = initMpu;
     // initialize device
     Serial.println("Initializing I2C devices...");
-    Wire.beginTransmission(HMC5883L_ARRD);
-    Wire.write(0x02); // Адреса регістру конфігурації для режиму роботи
-    Wire.write(0x00); // Записуємо 0x00, щоб встановити режим роботи за замовчуванням (режим роботи 0)
-    Wire.endTransmission();
-    // compass.initialize();
-    // Serial.println(compass.testConnection() ? "HMC5883L connection successful" : "HMC5883L connection failed");
+    // Wire.beginTransmission(HMC5883L_ARRD);
+    // Wire.write(0x02); // Адреса регістру конфігурації для режиму роботи
+    // Wire.write(0x00); // Записуємо 0x00, щоб встановити режим роботи за замовчуванням (режим роботи 0)
+    // Wire.endTransmission();
+    compass.initialize();
+    Serial.println(compass.testConnection() ? "HMC5883L connection successful" : "HMC5883L connection failed");
 }
 
 void MagnetometerHelper::calc_offsets(void)
@@ -38,7 +38,6 @@ void MagnetometerHelper::readMagnetometer(int16_t *x, int16_t *y, int16_t *z)
 }
 void MagnetometerHelper::getMagnetometer(int16_t *x, int16_t *y, int16_t *z)
 {
-    // compass.getHeading(&x, &y, &z);
     if (!getMagnetometerRaw(x, y, z))
         return;
 
@@ -52,20 +51,23 @@ byte MagnetometerHelper::getMagnetometerRaw(int16_t *x, int16_t *y, int16_t *z)
 {
     if (!magnetometerReady())
         return 0;
+    *x = compass.getHeadingX();
+    *y = compass.getHeadingY();
+    *z = compass.getHeadingZ();
+    // compass.getHeading(x, y, z);
+    // Wire.beginTransmission(HMC5883L_ARRD);
+    // Wire.write(HMC5883L_RA_DATAX_H); // read from address zero = x,y,z registers.
+    // int err = Wire.endTransmission();
 
-    Wire.beginTransmission(HMC5883L_ARRD);
-    Wire.write(HMC5883L_RA_DATAX_H); // read from address zero = x,y,z registers.
-    int err = Wire.endTransmission();
-
-    if (!err)
-    {
-        Wire.requestFrom((byte)HMC5883L_ARRD, (byte)6); // Blocking?
-        while (Wire.available() < 6)
-            ; // Wait if above blocking then this not needed.
-        *x = (int16_t)(Wire.read() | Wire.read() << 8);
-        *y = (int16_t)(Wire.read() | Wire.read() << 8);
-        *z = (int16_t)(Wire.read() | Wire.read() << 8);
-    }
+    // if (!err)
+    // {
+    //     Wire.requestFrom((byte)HMC5883L_ARRD, (byte)6); // Blocking?
+    //     while (Wire.available() < 6)
+    //         ; // Wait if above blocking then this not needed.
+    //     *x = (int16_t)(Wire.read() | Wire.read() << 8);
+    //     *y = (int16_t)(Wire.read() | Wire.read() << 8);
+    //     *z = (int16_t)(Wire.read() | Wire.read() << 8);
+    // }
     return 1;
 }
 
@@ -74,7 +76,7 @@ byte MagnetometerHelper::magnetometerReady(void)
     byte stat, ovfl, skipped;
     // Data ready?
     Wire.beginTransmission(HMC5883L_ARRD); // HMC5883L I2C address
-    Wire.write(HMC5883L_RA_STATUS);             // Read from status reg
+    Wire.write(HMC5883L_RA_STATUS);        // Read from status reg
     int num = Wire.endTransmission();
     Wire.requestFrom((byte)HMC5883L_ARRD, (byte)1);
     stat = Wire.read();    // RDY bit (bit 0)
