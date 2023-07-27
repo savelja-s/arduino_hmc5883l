@@ -3,26 +3,19 @@
 
 MPUHelper::MPUHelper() {}
 
-
-void MPUHelper::calibrate() {
-    // MPU6050 calibration code
-    // ...
-}
-
-
 void MPUHelper::initialize()
 {
+    uint8_t devStatus; // return status after each device operation (0 = success, !0 = error)
+    uint16_t packetSize;
     // load and configure the DMP
     mpu.initialize();
     Serial.println(F("Initializing DMP..."));
     devStatus = mpu.dmpInitialize();
-
     // supply your own gyro offsets here, scaled for min sensitivity
     mpu.setXGyroOffset(220);
     mpu.setYGyroOffset(76);
     mpu.setZGyroOffset(-85);
     mpu.setZAccelOffset(1788); // 1688 factory default for my test chip
-
     // make sure it worked (returns 0 if so)
     if (devStatus == 0)
     {
@@ -33,7 +26,6 @@ void MPUHelper::initialize()
         // turn on the DMP, now that it's ready
         Serial.println(F("Enabling DMP..."));
         mpu.setDMPEnabled(true);
-
         // get expected DMP packet size for later comparison
         packetSize = mpu.dmpGetFIFOPacketSize();
         Serial.print(F("DMP Initialization FIFOPacketSize"));
@@ -53,13 +45,7 @@ void MPUHelper::initialize()
     mpu.setI2CMasterModeEnabled(false);
     mpu.setI2CBypassEnabled(true);
     mpu.setSleepEnabled(false);
-
     // verify connection
     Serial.println("Testing device connections...");
     Serial.println(mpu.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
-}
-
-void MPUHelper::readAccelerometer(int16_t &accX, int16_t &accY, int16_t &accZ)
-{
-    mpu.getAcceleration(&accX, &accY, &accZ);
 }

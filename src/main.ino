@@ -22,46 +22,40 @@ void setup()
 
 void loop()
 {
-  int16_t accX, accY, accZ;
-  int bearing;
   static unsigned long BLTimeWas = millis();
+  int16_t x, y, z; // Raw compass output values.
+  int bearing;
   if (digitalRead(BUTTON_CAL) == 0)
   {
     magHelper.calibrate(1, 0);
-    // calibrate(1, 1);
   }
   if (digitalRead(BUTTON_TEST) == 0)
   {
     magHelper.calibrate(0, 0);
-    // calibrate(0, 1);
   }
-  Serial.println("------------------REEEEAAADDD MPU--------------2222");
-  mpuHelper.readAccelerometer(accX, accY, accZ);
-  Serial.println("------------------REEEEAAADDD COMPASS--------------");
-  magHelper.readXYZ();
+  magHelper.getMagnetometer(&x, &y, &z);
 
-  Serial.print("Accelerometer: ");
-  Serial.print("X = ");
-  Serial.print(accX);
-  Serial.print(", Y = ");
-  Serial.print(accY);
-  Serial.print(", Z = ");
-  Serial.println(accZ);
-  Serial.print("mag:\t");
-  Serial.print(magHelper.mx);
-  Serial.print("\t");
-  Serial.print(magHelper.my);
-  Serial.print("\t");
-  Serial.print(magHelper.mz);
-  Serial.print("\t");
-  bearing = (int)magHelper.getMagnetometerBearing();
+  // Serial.print("Accel: ");
+  // Serial.print("X = ");
+  // Serial.print(accX);
+  // Serial.print(", Y = ");
+  // Serial.print(accY);
+  // Serial.print(", Z = ");
+  // Serial.print(accZ);
+  Serial.print("mag: x=");
+  Serial.print(x);
+  Serial.print("\t y=");
+  Serial.print(y);
+  Serial.print("\t z=");
+  Serial.println(z);
+  // bearing = (int)magHelper.getMagnetometerBearing(x, y, z);
 
-  int tbearing = magHelper.getMagnetometerTiltCompensatedBearing();
+  // int tbearing = magHelper.getMagnetometerTiltCompensatedBearing(x, y, z);
 
-  Serial.print("\tbearing:\t");
-  Serial.print(bearing);
-  Serial.print("\tt_bearing:\t");
-  Serial.println(tbearing);
+  // Serial.print("\tbearing:\t");
+  // Serial.print(bearing);
+  // Serial.print("\tt_bearing:\t");
+  // Serial.println(tbearing);
   // blink LED to indicate activity
   if (millis() - BLTimeWas > 400)
   { // LED toggle
@@ -73,6 +67,4 @@ void loop()
     else
       digitalWrite(LED_PIN, LOW);
   }
-
-  delay(1000); // Затримка для читабельного виводу
 }
