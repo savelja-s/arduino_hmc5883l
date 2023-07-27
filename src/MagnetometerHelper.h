@@ -8,9 +8,10 @@ class MagnetometerHelper
 {
 public:
     MagnetometerHelper();
-    // int16_t ax, ay, az;
-    // int16_t gx, gy, gz;
-    // int16_t mx, my, mz;
+    int minx, maxx, miny, maxy, minz, maxz;
+    int offx = 0;
+    int offy = 0;
+    int offz = 0;
     bool inversXY = true;
     void initialize(MPU6050 mpu);
     void calibrate(boolean eeprom_write, byte xy_or_z);
@@ -24,17 +25,11 @@ public:
     void getMagnetometer(int16_t *x, int16_t *y, int16_t *z);
     byte getMagnetometerRaw(int16_t *x, int16_t *y, int16_t *z);
     void readMagnetometer(int16_t *x, int16_t *y, int16_t *z);
-    // void readXYZ();
-
     // Add other Magnetometer related methods here
 
 private:
     // HMC5883L compass;
     MPU6050 accelgyro;
-    int minx, maxx, miny, maxy, minz, maxz;
-    int offx = 0;
-    int offy = 0;
-    int offz = 0;
 };
 
 #endif

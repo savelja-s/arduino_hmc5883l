@@ -22,40 +22,45 @@ void setup()
 
 void loop()
 {
-  static unsigned long BLTimeWas = millis();
-  int16_t x, y, z; // Raw compass output values.
+  int16_t ax, ay, az;
+  int16_t mx, my, mz;
   int bearing;
+  static unsigned long BLTimeWas = millis();
   if (digitalRead(BUTTON_CAL) == 0)
   {
     magHelper.calibrate(1, 0);
+    // calibrate(1, 1);
   }
   if (digitalRead(BUTTON_TEST) == 0)
   {
     magHelper.calibrate(0, 0);
+    // calibrate(0, 1);
   }
-  magHelper.getMagnetometer(&x, &y, &z);
+  mpuHelper.mpu.getAcceleration(&ax, &ay, &az);
+  magHelper.getMagnetometer(&mx, &my, &mz);
 
-  // Serial.print("Accel: ");
-  // Serial.print("X = ");
-  // Serial.print(accX);
-  // Serial.print(", Y = ");
-  // Serial.print(accY);
-  // Serial.print(", Z = ");
-  // Serial.print(accZ);
-  Serial.print("mag: x=");
-  Serial.print(x);
-  Serial.print("\t y=");
-  Serial.print(y);
-  Serial.print("\t z=");
-  Serial.println(z);
-  // bearing = (int)magHelper.getMagnetometerBearing(x, y, z);
+  Serial.print("Accelerometer: ");
+  Serial.print("X = ");
+  Serial.print(ax);
+  Serial.print(", Y = ");
+  Serial.print(ay);
+  Serial.print(", Z = ");
+  Serial.print(az);
+  Serial.print("\t mag:x=");
+  Serial.print(ax);
+  Serial.print("\ty=");
+  Serial.print(ay);
+  Serial.print("\tz=");
+  Serial.print(az);
+  Serial.print("\t");
+  bearing = (int)magHelper.getMagnetometerBearing(ax, ay, az);
 
-  // int tbearing = magHelper.getMagnetometerTiltCompensatedBearing(x, y, z);
+  int tbearing = magHelper.getMagnetometerTiltCompensatedBearing(ax, ay, az);
 
-  // Serial.print("\tbearing:\t");
-  // Serial.print(bearing);
-  // Serial.print("\tt_bearing:\t");
-  // Serial.println(tbearing);
+  Serial.print("\tbearing:\t");
+  Serial.print(bearing);
+  Serial.print("\tt_bearing:\t");
+  Serial.println(tbearing);
   // blink LED to indicate activity
   if (millis() - BLTimeWas > 400)
   { // LED toggle
