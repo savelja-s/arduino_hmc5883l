@@ -1,6 +1,10 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
+#define HMC5883L_ARRD 0x1E
+#define HMC5883L_RA_STATUS 0x09
+#define HMC5883L_RA_DATAX_H 0x03
+
 #define BUTTON_CAL 10
 #define BUTTON_TEST 11
 // #define BUTTON_CAL 15

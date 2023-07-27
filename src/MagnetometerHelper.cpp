@@ -4,10 +4,8 @@
 #include "EEPROMHelper.h"
 #include "Constants.h"
 
-MagnetometerHelper::MagnetometerHelper()
-{
-    int offx = 0, offy = 0, offz = 0;
-}
+MagnetometerHelper::MagnetometerHelper() {}
+
 void MagnetometerHelper::read_with_eeprom_min_max_for_xyz()
 {
     EEPROMHelper::eeprom_read_min_max_for_xyz(minx, maxx, miny, maxy, minz, maxz);
@@ -18,8 +16,12 @@ void MagnetometerHelper::initialize(MPU6050 initMpu)
     accelgyro = initMpu;
     // initialize device
     Serial.println("Initializing I2C devices...");
-    compass.initialize();
-    Serial.println(compass.testConnection() ? "HMC5883L connection successful" : "HMC5883L connection failed");
+    Wire.beginTransmission(HMC5883L_ARRD);
+    Wire.write(0x02); // Адреса регістру конфігурації для режиму роботи
+    Wire.write(0x00); // Записуємо 0x00, щоб встановити режим роботи за замовчуванням (режим роботи 0)
+    Wire.endTransmission();
+    // compass.initialize();
+    // Serial.println(compass.testConnection() ? "HMC5883L connection successful" : "HMC5883L connection failed");
 }
 
 void MagnetometerHelper::calc_offsets(void)
@@ -28,37 +30,72 @@ void MagnetometerHelper::calc_offsets(void)
     offy = (maxy + miny) / 2;
     offz = (maxz + minz) / 2;
 }
-void MagnetometerHelper::readXYZ()
+void MagnetometerHelper::readMagnetometer(int16_t *x, int16_t *y, int16_t *z)
 {
-    compass.getHeading(&mx, &my, &mz);
+    while (!magnetometerReady())
+        ;
+    getMagnetometer(x, y, z); // Note: Addresses of pointers passed.
+}
+void MagnetometerHelper::getMagnetometer(int16_t *x, int16_t *y, int16_t *z)
+{
+    // compass.getHeading(&x, &y, &z);
+    if (!getMagnetometerRaw(x, y, z))
+        return;
+
+    if (inversXY)
+    {
+        // modify for accel board orientation (board x = up, y to left).
+        *y = -(*y);
+    }
+}
+byte MagnetometerHelper::getMagnetometerRaw(int16_t *x, int16_t *y, int16_t *z)
+{
+    if (!magnetometerReady())
+        return 0;
+
+    Wire.beginTransmission(HMC5883L_ARRD);
+    Wire.write(HMC5883L_RA_DATAX_H); // read from address zero = x,y,z registers.
+    int err = Wire.endTransmission();
+
+    if (!err)
+    {
+        Wire.requestFrom((byte)HMC5883L_ARRD, (byte)6); // Blocking?
+        while (Wire.available() < 6)
+            ; // Wait if above blocking then this not needed.
+        *x = (int16_t)(Wire.read() | Wire.read() << 8);
+        *y = (int16_t)(Wire.read() | Wire.read() << 8);
+        *z = (int16_t)(Wire.read() | Wire.read() << 8);
+    }
+    return 1;
 }
 
 byte MagnetometerHelper::magnetometerReady(void)
 {
+    byte stat, ovfl, skipped;
     // Data ready?
-    Wire.beginTransmission(0x1E); // HMC5883L I2C address
-    Wire.write(0x09);             // Read from status reg
+    Wire.beginTransmission(HMC5883L_ARRD); // HMC5883L I2C address
+    Wire.write(HMC5883L_RA_STATUS);             // Read from status reg
     int num = Wire.endTransmission();
-    Wire.requestFrom((byte)0x1E, (byte)1);
+    Wire.requestFrom((byte)HMC5883L_ARRD, (byte)1);
     stat = Wire.read();    // RDY bit (bit 0)
     ovfl = stat & 0x02;    // Extract OVFL bit (bit 1)
     skipped = stat & 0x04; // Extract SKIPPED bit (bit 2)
     return (stat & 0x01);  // 0x01 is the RDY (Ready) flag
 }
-float MagnetometerHelper::getMagnetometerBearing()
+float MagnetometerHelper::getMagnetometerBearing(int16_t ix, int16_t iy, int16_t iz)
 {
-    int16_t x = mx - offx;
-    int16_t y = my - offy;
-    int16_t z = mz - offz;
+    int x = ix - offx;
+    int y = iy - offy;
+    int z = iz - offz;
     float atan2val = 180 / M_PI * atan2((float)y, (float)x); // NEW coords.
     int b = (int)(-atan2val + 360) % 360;
     return b;
 }
-float MagnetometerHelper::getMagnetometerTiltCompensatedBearing()
+float MagnetometerHelper::getMagnetometerTiltCompensatedBearing(int16_t ix, int16_t iy, int16_t iz)
 {
-    int x = mx - offx;
-    int y = my - offy;
-    int z = mz - offz;
+    int x = ix - offx;
+    int y = iy - offy;
+    int z = iz - offz;
     float r, p, mx, my, mz;
 
     getRollPitch(&r, &p);
@@ -97,8 +134,11 @@ void MagnetometerHelper::getRollPitchRawFloat(float *roll, float *pitch)
 
     r = sqrt(x * x + y * y + z * z);
 
-    // modify for accel board orientation (board x = up, y to left).
-    y = -y;
+    if (inversXY)
+    {
+        // modify for accel board orientation (board x = up, y to left).
+        y = -y;
+    }
     *pitch = 180 / M_PI * asin(x / r);
     *roll = 180 / M_PI * -asin(y / r);
 }
@@ -107,15 +147,12 @@ void MagnetometerHelper::getRollPitch(float *roll, float *pitch)
     static float avg_r[SMOOTH_ACCELL], avg_p[SMOOTH_ACCELL];
     static byte idx = 0;
     float r, p;
-
     getRollPitchRawFloat(roll, pitch);
-
     avg_r[idx] = *roll; // Smooth.
     avg_p[idx] = *pitch;
     idx++;
     if (idx >= SMOOTH_ACCELL)
         idx = 0;
-
     r = p = 0;
     for (int i = 0; i < SMOOTH_ACCELL; i++)
     {
@@ -124,7 +161,6 @@ void MagnetometerHelper::getRollPitch(float *roll, float *pitch)
     }
     r /= SMOOTH_ACCELL;
     p /= SMOOTH_ACCELL;
-
     *roll = r;
     *pitch = p;
 }
@@ -132,82 +168,49 @@ void MagnetometerHelper::getRollPitch(float *roll, float *pitch)
 void MagnetometerHelper::calibrate(boolean eeprom_write, byte xy_or_z)
 {
     unsigned long calTimeWas = millis();
-
-    //    int x,y,z;
-    //    float deg=0,deg2=0;
-
-    //    readMagnetometer(&x, &y, &z);
-
-    maxx = minx = mx; // Set initial values to current magnetometer readings.
-    maxy = miny = my;
-    maxz = minz = mz;
-
+    int16_t x, y, z;
+    readMagnetometer(&x, &y, &z);
+    maxx = minx = x; // Set initial values to current magnetometer readings.
+    maxy = miny = y;
+    maxz = minz = z;
     delay(300); // Allow button release.
-
     while (1)
     { // Calibration loop.
-
         if (digitalRead(BUTTON_CAL) == 0 || digitalRead(BUTTON_TEST) == 0)
         {
             delay(300); // Allow button release.
             return;     // Abort
         }
-
         if (magnetometerReady())
-            readXYZ();
-        if (mx > maxx)
-            maxx = mx;
-        if (mx < minx)
-            minx = mx;
-        if (my > maxy)
-            maxy = my;
-        if (my < miny)
-            miny = my;
-        if (mz > maxz)
-            maxz = mz;
-        if (mz < minz)
-            minz = mz;
-
-        //   display.clearDisplay();
-
-        //   display.setTextSize(2);
-        //   display.setCursor(0,0);
-
+            getMagnetometer(&x, &y, &z);
+        if (x > maxx)
+            maxx = x;
+        if (x < minx)
+            minx = x;
+        if (y > maxy)
+            maxy = y;
+        if (y < miny)
+            miny = y;
+        if (z > maxz)
+            maxz = z;
+        if (z < minz)
+            minz = z;
         if (eeprom_write)
             Serial.println("CALIB");
         else
             Serial.println("TEST");
 
-        //   display.setCursor(0,16);
         if (!xy_or_z)
             Serial.println("XY");
         else
             Serial.println("Z");
-
         int secmillis = millis() - calTimeWas;
         if (secmillis > CALTIME)
             break; // Exit after time up.
-
-        int secs = (int)((CALTIME - secmillis + 1000) / 1000);
-        //   display.setCursor(0,32);
         Serial.println("--> ");
         Serial.println((int)((CALTIME - secmillis) / 1000));
-
-        //   drawBearing((int)deg2, midx, midy , radius);
-        //   drawBearing((int)deg, midx, midy , radius);
-
-        //   deg = (360.0/CALTIME)*secmillis; // Rotate a line for countdown duration.
-
-        //   deg2 += deg; // Rotate a line for countdown duration. Fun.
-        //   deg = fmod(deg,360);
-
-        //   for(int i=0;i<360;i+=45)   // 45 Degree spokes (rotating)
-        // drawBearing(i + (45/secs)*10, midx, midy, radius-7);
-
-        //   display.display();  // Update display.
         delay(10);
     } // while cal
-
     if (xy_or_z == 0)
     {
         offx = ((maxx - minx) / 2) + minx;
@@ -216,22 +219,14 @@ void MagnetometerHelper::calibrate(boolean eeprom_write, byte xy_or_z)
     }
     else
         // offz = ((maxz - minz) / 2) + minz;
-
         if (eeprom_write)
         {
             EEPROMHelper::eeprom_write_min_max_for_xyz(xy_or_z, minx, maxx, miny, maxy, minz, maxz);
         }
 
     unsigned long dispExitTimeWas = millis();
-
     while (1)
     {
-
-        //   display.clearDisplay();
-
-        //   display.setTextSize(2);
-        //   display.setCursor(0,0);
-
         // Make sure this does not repeat endlessly!
         if (eeprom_write)
             Serial.println("EEPROM Written");
@@ -239,8 +234,6 @@ void MagnetometerHelper::calibrate(boolean eeprom_write, byte xy_or_z)
             Serial.println("TEST DMY Write");
         if (millis() - dispExitTimeWas > 2000)
             break;
-
-        //   display.display();  // Update display.
         delay(10);
     }
     calc_offsets();
