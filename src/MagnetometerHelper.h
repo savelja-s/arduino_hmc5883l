@@ -1,7 +1,7 @@
 #ifndef MAGNETOMETER_HELPER_H
 #define MAGNETOMETER_HELPER_H
 
-#include "HMC5883L.h"
+// #include "HMC5883L.h"
 #include "MPU6050_6Axis_MotionApps20.h"
 
 class MagnetometerHelper
@@ -29,7 +29,7 @@ public:
     // Add other Magnetometer related methods here
 
 private:
-    HMC5883L compass;
+    // HMC5883L compass;
     MPU6050 accelgyro;
     int minx, maxx, miny, maxy, minz, maxz;
     int offx = 0;
